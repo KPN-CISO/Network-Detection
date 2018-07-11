@@ -1,0 +1,1 @@
+alert tcp !<exclude filter> any -> <target> 135 (msg:"IWbemLevel1Login NTLMlogin attempt detected [MS-WMI 3.1.4.1.4]"; flow:to_server,established; dce_iface:F309AD18-D86A-11d0-A075-00C04FB68820; dce_opnum:6; tag:session,600,seconds,0,packets; metadata:service dcerpc; reference:url,<insert URL>; classtype:policy-violation; sid:<number>; rev:<number>)
