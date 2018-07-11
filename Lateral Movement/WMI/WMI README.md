@@ -9,7 +9,7 @@ These rules are 'policy' based. So this means that the variables used should mat
 These rules are not useful for detection of vulnerabilities and exploits.
 
 ### Rules
-1. [WMI OXID](1. WMI rule OXID.txt)
+1. [WMI OXID](1.WMI_rule_OXID.txt)
 
  - dce_iface:99fcfec4-5260-101b-bbcb-00aa0021347a	(GUID for OXID resolver) <br>
 **Note:** OXID interface is part of DCOM, not specific to WMI. Because most of WMI traffic is using DCOM/RPC you would expect traffic on the OXID interface. 
@@ -21,7 +21,7 @@ Although it is at least suspicious if DCOM related traffic is initiated from a c
  - metadata:service dcerpc	(match for all DCERPC detected streams, on all ports) <br>
 **Note:** DCOM uses RPC for transport. Windows uses connection oriented (TCP) RPC by default. Initially traffic routes over port 135, but later in a session it switches to srcport >1024 -> dstport >1024
 
-2. [WMI NTLMlogin](2. WMI rule NTLMLogin.txt)
+2. [WMI NTLMlogin](2.WMI_rule_NTLMLogin.txt)
 
 
  - dce_iface:F309AD18-D86A-11d0-A075-00C04FB68820	(GUID for IWbemLevel1Login interface, typical pattern for the start of a "WMI handshake/session")
