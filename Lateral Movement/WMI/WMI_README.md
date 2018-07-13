@@ -13,7 +13,7 @@ These rules are 'policy' based. This means the variables used should match traff
 
 ### Rules
 
-####[WMI OXID](1.WMI_rule_OXID.txt)
+#### [WMI OXID](1.WMI_rule_OXID.txt)
 
  - `dce_iface:99fcfec4-5260-101b-bbcb-00aa0021347a`	(GUID for OXID resolver)
    **Note:** OXID interface is part of DCOM, not specific to WMI. Because most of WMI traffic is using DCOM/RPC you would expect traffic on the OXID interface.  But there are WMI variants that do not trigger on OXID traffic, so there is a chance for false negatives. A hit on an 'OXID rule' COULD indicate that WMI is involved. But it's not necessarily the case (other legit applications could use remote DCOM as well). Although it is at least suspicious if DCOM related traffic is initiated from a client to a server.
