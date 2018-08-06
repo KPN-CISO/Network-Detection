@@ -1,1 +1,0 @@
-alert tcp !<exclude filter> any -> <target> 135 (msg:"suscpicious DCOM (oxid) traffic"; flow:to_server,established; dce_iface:99fcfec4-5260-101b-bbcb-00aa0021347a; metadata:service dcerpc; classtype:policy-violation; sid:<number>; rev:<number>)
