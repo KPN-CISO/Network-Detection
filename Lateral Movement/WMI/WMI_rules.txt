@@ -1,8 +1,8 @@
 
 # category/sid range:
-## rpc, 1st stage		..100 - 4400110
-## wmi, 2nd stage:		..110 - 4400130
-## rpc reject/denied 	..130 - 4400140
+## rpc, 1st stage	..100 - 4400110
+## wmi, 2nd stage	..110 - 4400130
+## rpc reject/denied..130 - 4400140
 
 
 ## stage 1 > RPC
@@ -20,8 +20,8 @@ alert tcp !$legitimate_sources any -> $your_protected_assets 135 (msg:"Indicator
 
 
 ## RPC > reject/denied
-# alert tcp $your_protected_assets 135 -> !$legitimate_sources any  (msg:"RPC response fault_access_denied using dce modifier"; flow:to_client,established; content:"|05 00 03|"; offset:0; depth:3; byte_test:4,=,0x00000005,24,dce; metadata:service dcerpc;  classtype:unknown; sid:4400132; rev:1; )
+# alert tcp $your_protected_assets 135 -> !$legitimate_sources any (msg:"RPC response fault_access_denied using dce modifier"; flow:to_client,established; content:"|05 00 03|"; offset:0; depth:3; byte_test:4,=,0x00000005,24,dce; metadata:service dcerpc;  classtype:unknown; sid:4400132; rev:1; )
 
-alert tcp $your_protected_assets 135 -> !$legitimate_sources any  (msg:"RPC response fault_access_denied using little endian modifier"; flow:to_client,established; content:"|05 00 03|"; offset:0; depth:3; byte_test:4,=,0x00000005,24,little; metadata:service dcerpc; classtype:unknown; sid:4400137; rev:2; )
+alert tcp $your_protected_assets 135 -> !$legitimate_sources any (msg:"RPC response fault_access_denied using little endian modifier"; flow:to_client,established; content:"|05 00 03|"; offset:0; depth:3; byte_test:4,=,0x00000005,24,little; metadata:service dcerpc; classtype:unknown; sid:4400137; rev:2; )
 
 
