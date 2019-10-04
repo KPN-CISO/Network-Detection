@@ -1,66 +1,27 @@
-#  Context and approach
-#
-# These rules were developed with these objectives in mind in advance:
-# -           Detection of WMI usage attempts too, not just WMI in action. And for both passed and failed attempts. When these rules fire, you could consider this as “early warning” indicator’s.
-# -           Provision of possible traces/evidence of which identity or credentials were used. This would enable better follow up, like analysis by security analyst’s and incident responders.
-# -           Provision insight in what was carried out (remote execution of command’s, query or data exfiltration)
 
-# Testing of rules was conducted across combination’s of client and server OS’s:
-# -           Server side: windows releases (windows 2012 R2, windows 2016, Windows 10 pro)
-# -           Used clients: windows 7, windows 10, Debian linux with latest package “impacket” available from https://github.com/CoreSecurity/impacket. See examples section; wmiexec, wmiquery
-# -           Detection via Snort IDS: current version, 2.9.11.1, with default configuration and custom rules.
-
-# Remaining issues (please help and share improvements)
-# -          The dce modifier in the bytetest keyword (f.e. as used in the “RPC access denied rule “) . Might be a misinterpretation on my side ? So current rule does not take auto-detect into account of the used endianness. A re-run with snort compiled in debugging mode (using snort_pp_debug, dce2_debug, snort_debug) directives presented more insight info, however it did not provide a clue so far.
-# -           Use of encryption on rpc level ( auth level “auth priv”) leads to false negatives on the early warning rules. Even detection of “generic” type of “remote activation” call failed.
-#
-# You are welcomed to submit feedback and to contribute improvements. The comment’s below provides clues for that.
-#
-#
-#
-#The overview below summarizes a selection of rules developed, and assesses the false positive (FP) /false negative(FN) rate.
-#
-#### early warning  - rules. The rules are supposed to be used in conjunction with each other.
-alert tcp !legitimate_sources any -> $your_protected_assets  135  (msg:"RPC remote activation of WMI [MS-DCOM 3.1.2.5.2.2]"; flow:to_server,established; dce_iface:000001a0-0000-0000-c000-000000000046; content:"|5e f0 c3 8b 6b d8 d0 11 a0 75 00 c0 4f b6 88 20|"; flowbits:set,wmi_remoteactivation_attempt; metadata:service dcerpc; reference:url,https://msdn.microsoft.com/en-us/library/cc226958.aspx; classtype:policy-violation; sid:4103001; rev:2; )
-# desc: this rule attempts to detect activation of the WMI classobject as denoted by GUID (UUID) 8BC3F05E-D86B-11D0-A075-00C04FB68820. The GUID is passed as context in the request. This translates into the raw byte sequence as can read from the rule.
-# FN, yes, when auth encryption “packet privacy” is used.
-# FP, not known at this time.                     
-
-alert tcp $your_protected_assets any 135  -> !legitimate_sources any (msg:"RPC access denied in WMI session initialisation"; flow:to_client, established; flowbits:isset,wmi_remoteactivation_attempt; content:"|05 00 03|"; offset:0; depth:3; byte_test:4,=,0x00000005,24,little; metadata:service dcerpc; classtype:policy-violation; sid:4103009; rev:2; )
-# desc: attempt to detect a RPC PDU “fault” type. If for the same session, a WMI initialization was observed, this rule would fire.
-# FN: not known. Endianess is manually set to Little endian. The preferred way is to have the dcerpc2 preprocessor handle this. However 
-# FP: yes, as a RPC session represented by a (tcp) stream may share several context ID’s, this rule does not account for that. It might be that the reject response refers to another call than the WMI startup call
-
-alert tcp $your_protected_assets any 135  -> !legitimate_sources any (msg:"RPC generic access denied"; flow:to_client, established; flowbits:isnotset,wmi_remoteactivation_attempt; content:"|05 00 03|"; offset:0; depth:3; byte_test:4,=,0x00000005,24,little; metadata:service dcerpc; classtype:policy-violation; sid:4103005; rev:2; )
-# desc: if the more specific rule (the former one) does not match, and if match for the same established session, then alert
-# FN: see remaining issues
-# FP: not known.
-
-# Generic remote create instance of object
-alert tcp $your_protected_assets any 135  -> !legitimate_sources any  (msg:"RPC request generic remote activation”;  flow:to_server,established;  dce_iface:000001a0-0000-0000-c000-000000000046;metadata:service dcerpc;   reference: url, https://msdn.microsoft.com/en-us/library/cc226958.aspx; classtype:policy-violation; sid:4103004; rev:4;)
-# FN: Yes, if WMI session is setup using auth method “packet privacy” (for other levels this might be the same)
-# FP: High. By nature, any alarms would could mean WMI over RPC usage, but other remote object’s as well. Depending on your policy, just RPC traffic could be as suspicious.
+# category/sid range:
+## rpc, 1st stage	..100 - 4400110
+## wmi, 2nd stage	..110 - 4400130
+## rpc reject/denied..130 - 4400140
 
 
-### end of early warning  section
+## stage 1 > RPC
+alert tcp !$legitimate_sources any -> $your_protected_assets 135 (msg:"Remote activation attempt WMI clsid (littleendian) (unencrypted stub)"; dce_iface:000001a0-0000-0000-c000-000000000046; dce_opnum: 4; dce_stub_data; content: "|5e f0 c3 8b 6b d8 d0 11 a0 75 00 c0 4f b6 88 20|"; reference:url, https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-wmi/38d52a83-1613-4c56-8418-12ad1145eeaa; sid:4400100; rev:1 )
 
 
+## stage 2 > WMI
+alert tcp !$legitimate_sources any -> $your_protected_assets 135 (msg:"Indicator WMI - IWbemLevel1Login interface method NTLMlogin [MS-WMI 3.1.4.1.4]"; flow:to_server,established; dce_iface:F309AD18-D86A-11d0-A075-00C04FB68820; dce_opnum:6; metadata:service dcerpc; classtype:policy-violation; sid:4400110; rev:4; )
 
-#### WMI in action - rules
+alert tcp !$legitimate_sources any -> $your_protected_assets 135 (msg:"Indicator WMI - IWbemLevel1Login interface - RAW content - generic method"; flow:to_server,established; content:"|18 ad 09 f3 6a d8 d0 11 a0 75 00 c0 4f b6 88 20|"; metadata:service dcerpc; classtype:policy-violation; sid:4400112; rev:1; )
 
-alert tcp !legitimate_sources any -> $your_protected_assets 135  (msg:”Request for WMI interface IWbemLevel1Login – indicator user connecting [MS-WMI 3.1.4.1]"; flow:to_server,established; dce_iface:F309AD18-D86A-11d0-A075-00C04FB68820; tag:session,exclusive; reference:url, https://msdn.microsoft.com/en-us/library/cc250739.aspx;  metadata:service dcerpc;  classtype:policy-violation;  sid:4103022; rev:1; )
-# desc: attempts to detect WMI handshaking, i.e. a user connecting to the management services interface in an particular namespace.  Captures additional traffic voor current session for analysis and response (see objectives)
-# FP: not known.
-# FN: not known.
+alert tcp !$legitimate_sources any -> $your_protected_assets 135 (msg:"Indicator WMI - IWebmServices interface [MS-WMI 3.1.4.3]"; flow:to_server,established; dce_iface:9556dc99-828c-11cf-a37e-00aa003240c7; metadata:service dcerpc; classtype:policy-violation; sid:4400114; rev:2; )
 
-alert tcp !legitimate_sources any -> $your_protected_assets 135  (msg:"Request for WMI query results [MS-WMI 3.1.4.4]”; flow:to_server,established; dce_iface:027947e1-d731-11ce-a357-000000000001; metadata:service dcerpc;  reference:url, https://msdn.microsoft.com/enus/library/cc250793.aspx; classtype:policy-violation; sid:4103020; rev:1; )
-# desc: attempts to detect enumerating of common information model (CIM) objects
-# FP: not known.
-# FN: yes, for native WMI (windows) clients. Using “impacket” did fire alert’s though.
+alert tcp !$legitimate_sources any -> $your_protected_assets 135 (msg:"Indicator WMI - IWebmServices interface - RAW content [MS-WMI 3.1.4.3]"; flow:to_server,established; content: "|99 dc 56 95 8c 82 cf 11 a3 7e 00 aa 00 32 40 c7|"; metadata:service dcerpc; classtype:policy-violation; sid:4400115; rev:2; )
 
-alert tcp !legitimate_sources any -> $your_protected_assets 135   (msg:"Request for interface IWebmServices - indicator remote WMI query or exec [MS-WMI 3.1.4.3]"; flow:to_server,established; dce_iface:9556dc99-828c-11cf-a37e-00aa003240c7; reference: url, https://msdn.microsoft.com/en-us/library/cc250780.aspx; metadata:service dcerpc;  classtype:policy-violation; sid:4103023; rev:1;)
-# desc: attempts to detect remote execution or remote queryíng. See Microsoft’s documentation for an extensive list of opnums (methods)  and it’s meaning that are exposed by this interface ;   
-# FP: not known.
-# FN: yes, for native WMI (windows) clients, using impackets did fire alert’s though.
 
-#### WMI in action - rules
+## RPC > reject/denied
+# alert tcp $your_protected_assets 135 -> !$legitimate_sources any (msg:"RPC response fault_access_denied using dce modifier"; flow:to_client,established; content:"|05 00 03|"; offset:0; depth:3; byte_test:4,=,0x00000005,24,dce; metadata:service dcerpc;  classtype:unknown; sid:4400132; rev:1; )
+
+alert tcp $your_protected_assets 135 -> !$legitimate_sources any (msg:"RPC response fault_access_denied using little endian modifier"; flow:to_client,established; content:"|05 00 03|"; offset:0; depth:3; byte_test:4,=,0x00000005,24,little; metadata:service dcerpc; classtype:unknown; sid:4400137; rev:2; )
+
+
